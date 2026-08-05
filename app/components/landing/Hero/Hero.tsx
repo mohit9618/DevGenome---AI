@@ -92,14 +92,14 @@ export default function Hero() {
           <div className="flex flex-wrap gap-4">
 
             <Link
-              href="/signup"
+              href="/sign-up"
               className="btn btn-primary btn-lg"
             >
               Get Started
             </Link>
 
             <Link
-              href="/signin"
+              href="/sign-in"
               className="btn btn-outline btn-lg"
             >
               Sign In
