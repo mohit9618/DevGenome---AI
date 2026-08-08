@@ -14,11 +14,14 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
+
   clerkId   String   @unique
   name      String?
   email     String   @unique
   imageUrl  String?
+
   resumes   Resume[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -27,7 +30,7 @@ model Resume {
   id String @id @default(cuid())
 
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title    String
   template String
@@ -35,8 +38,37 @@ model Resume {
   profileImage         String?
   profileImagePublicId String?
 
-  resumePdf         String?
-  resumePdfPublicId String?
+  resumePdf            String?
+  resumePdfPublicId    String?
+
+  content Json? 
+
+  analysis ResumeAnalysis?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ResumeAnalysis {
+  id String @id @default(cuid())
+
+  resumeId String @unique
+  resume   Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  extractedText String?
+
+  aiScore Int?
+
+  strengths Json?
+  weaknesses Json?
+  missingSections Json?
+
+  improvements Json?
+
+  aiImprovedPdf         String?
+  aiImprovedPdfPublicId String?
+
+  reviewedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

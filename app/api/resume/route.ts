@@ -26,6 +26,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({error:"User not found"}, {status:404});
     }
 
+    const existingResume = await prisma.resume.findFirst({
+      where: {
+        userId: existingUser.id,
+      },
+    });
+    if(existingResume){
+      return NextResponse.json({error:"You already have a resume."},{status:400});
+    }
+
     const resume = await prisma.resume.create({
       data: {
         userId: existingUser.id,
@@ -35,7 +44,7 @@ export async function POST(request: NextRequest) {
         profileImagePublicId:body.profileImagePublicId,
         resumePdf:body.resumePdf,
         resumePdfPublicId:body.resumePdfPublicId,
-        
+        content: body.content,
       },
     });
 
@@ -48,7 +57,8 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-// Get all resumes
+
+// Get resume
 export async function GET() {
   try {
     const { userId } = await auth();
@@ -59,7 +69,8 @@ export async function GET() {
         { status: 401 }
       );
     }
-    console.log("Clerk User ID:", userId);
+    
+    console.log("1. Clerk user:", userId);
     const user = await prisma.user.findUnique({
       where: {
         clerkId: userId,
@@ -69,13 +80,23 @@ export async function GET() {
       },
     });
 
-    console.log("Database User:", user);
 
     if (!user) {
       return NextResponse.json({error:"User not found"}, {status:404});
     }
 
-    return NextResponse.json(user.resumes);
+    console.log("2. User:", user);
+    const resume = await prisma.resume.findFirst({
+      where:{
+        userId: user.id,
+      },
+      include:{
+        analysis: true,
+      },
+    })
+
+    console.log("3. Resume:", resume);
+    return NextResponse.json(resume);
 
 
   } catch (error) {
@@ -125,31 +146,43 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({error:"Forbidden"},{status:403});
     }
 
-    const updated_resume = await prisma.resume.update({
-      where: {
-        id: body.resumeId,
-      },
-      data: {
-        ...(body.title && { title: body.title }),
-        ...(body.template && { template: body.template }),
+  const updated_resume = await prisma.resume.update({
+  where: {
+    id: body.resumeId,
+  },
 
-        ...(body.profileImage && {
-          profileImage: body.profileImage,
-        }),
+  data: {
 
-        ...(body.profileImagePublicId && {
-          profileImagePublicId: body.profileImagePublicId,
-        }),
+    ...(body.title && {
+      title: body.title,
+    }),
 
-        ...(body.resumePdf && {
-          resumePdf: body.resumePdf,
-        }),
+    ...(body.template && {
+      template: body.template,
+    }),
 
-        ...(body.resumePdfPublicId && {
-          resumePdfPublicId: body.resumePdfPublicId,
-        }),
-      },
-    });
+    ...(body.profileImage && {
+      profileImage: body.profileImage,
+    }),
+
+    ...(body.profileImagePublicId && {
+      profileImagePublicId: body.profileImagePublicId,
+    }),
+
+    ...(body.resumePdf && {
+      resumePdf: body.resumePdf,
+    }),
+
+    ...(body.resumePdfPublicId && {
+      resumePdfPublicId: body.resumePdfPublicId,
+    }),
+
+    ...(body.content && {
+      content: body.content,
+    }),
+
+  },
+});
 
     return NextResponse.json(updated_resume);
 

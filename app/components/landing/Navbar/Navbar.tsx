@@ -89,14 +89,14 @@ export default function Navbar() {
       <div className="navbar-end gap-3">
 
         <Link
-          href="/signin"
+          href="/sign-in"
           className="btn btn-ghost"
         >
           Sign In
         </Link>
 
         <Link
-          href="/signup"
+          href="/sign-up"
           className="btn btn-primary"
         >
           Get Started

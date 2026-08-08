@@ -2,190 +2,184 @@
 
 import { useEffect, useState } from "react";
 
-import ResumeHeader from "@/app/components/resume/dashboard/ResumeHeader";
-import ResumeStats from "@/app/components/resume/dashboard/ResumeStats";
-import ResumeGrid from "@/app/components/resume/dashboard/ResumeGrid";
-import CreateResumeModal from "@/app/components/resume/dashboard/CreateResumeModal";
-import DeleteResumeModal from "@/app/components/resume/dashboard/DeleteResumeModal";
+import ResumeHeader from "@/app/components/resume/home/ResumeHeader";
+import ResumeStats from "@/app/components/resume/home/ResumeStats";
+import ResumeStatus from "@/app/components/resume/home/ResumeStatus";
+import CreateResumeCard from "@/app/components/resume/home/CreateResumeCard";
+import UploadResumeCard from "@/app/components/resume/home/UploadResumeCard";
+import Router, { useRouter } from "next/router";
+
 
 interface Resume {
   id: string;
   title: string;
   template: string;
+
   profileImage?: string;
   profileImagePublicId?: string;
+
   resumePdf?: string;
   resumePdfPublicId?: string;
+
   createdAt: string;
   updatedAt: string;
+
+  analysis?: {
+    aiScore?: number;
+    reviewedAt?: string;
+  };
 }
 
 export default function ResumePage() {
-  // Modals
-  const [createOpen, setCreateOpen] = useState(false);
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [resume, setResume] = useState<Resume | null>(null);
 
-  // Resume Data
-  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [deleting, setDeleting] = useState(false);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
 
-  // ---------------- GET ALL RESUMES ----------------
 
-  async function fetchResumes() {
-  try {
-    setLoading(true);
-    const response = await fetch("/api/resume");
-    const data = await response.json();
+  // ---------------- GET RESUME ----------------
 
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch resumes");
+  async function fetchResume() {
+    try {
+
+      setLoading(true);
+
+      const response = await fetch("/api/resume");
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch resume");
+      }
+
+      setResume(data);
+
+    } catch (err) {
+
+      console.error(err);
+
+      setError("Failed to load resume.");
+
+    } finally {
+
+      setLoading(false);
+
     }
-    setResumes(data);
-  } catch (err) {
-    setError("Failed to fetch resumes.");
-  } finally {
-    setLoading(false);
   }
-}
 
   useEffect(() => {
-    fetchResumes();
+    fetchResume();
   }, []);
 
-  // Post resumes
-
-  async function handleCreateResume(
-  title: string,
-  template: string
-){
-    console.log("handleCreateResume called", title, template);
-  try {
-    console.log("Creating resume...");
-
-    const response = await fetch("/api/resume", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        title,
-        template,
-      }),
-    });
-
-    console.log("POST Status:", response.status);
-
-    const data = await response.json();
-    console.log("POST Response:", data);
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to create resume");
-    }
-
-    setCreateOpen(false);
-
-    console.log("Refreshing resumes...");
-    await fetchResumes();
-    console.log("Refresh complete");
-
-  } catch (err) {
-    console.error(err);
-    alert("Failed to create resume.");
+  if (loading) {
+    return (
+      <main className="min-h-screen flex justify-center items-center">
+        <span className="loading loading-spinner loading-lg"></span>
+      </main>
+    );
   }
-}
 
-// Delete resume
+  if (error) {
+    return (
+      <main className="min-h-screen p-8">
+        <div className="alert alert-error">
+          <span>{error}</span>
+        </div>
+      </main>
+    );
+  }
 
-async function handleDeleteResume() {
+// /Delete Resume
+
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your resume?"
+    );
+
+    if (!confirmed) return;
+
     try {
+      setDeleting(true);
+
+      const getResponse = await fetch("/api/resume");
+
+      const resume = await getResponse.json();
+
+      if (!resume?.id) {
+        throw new Error("Resume not found");
+      }
+
       const response = await fetch("/api/resume", {
         method: "DELETE",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
-          resumeId: selectedResumeId,
+          resumeId: resume.id,
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to delete resume");
+        throw new Error(data.error);
       }
 
-      setDeleteOpen(false);
+      alert("Resume deleted successfully.");
 
-      fetchResumes();
-    } catch (err) {
-      console.log(err);
+      await fetchResume();
+
+    } catch (error) {
+      console.error(error);
       alert("Failed to delete resume.");
+    } finally {
+      setDeleting(false);
     }
   }
 
-  console.log({
-  loading,
-  error,
-  resumes,
-});
   return (
     <main className="min-h-screen bg-base-100 p-8">
 
-      <ResumeHeader
-  onCreate={() => setCreateOpen(true)}
-/>
+      <ResumeHeader />
 
       <ResumeStats
-        totalResumes={resumes.length}
-        templatesUsed={
-          new Set(resumes.map((r) => r.template)).size
-        }
-        atsScore={92}
-        lastEdited={
-          resumes.length
-            ? new Date(
-                resumes[0].updatedAt
-              ).toLocaleDateString()
+        hasResume={!!resume}
+        aiReviewed={!!resume?.analysis}
+        aiScore={resume?.analysis?.aiScore}
+        lastUpdated={
+          resume
+            ? new Date(resume.updatedAt).toLocaleDateString()
             : "-"
         }
       />
 
-      {loading ? (
-        <div className="flex justify-center mt-16">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      ) : error ? (
-        <div className="alert alert-error mt-10">
-          <span>{error}</span>
-        </div>
-      ) : (
-        <ResumeGrid
-          resumes={resumes}
-          onDelete={(id) => {
-            setSelectedResumeId(id);
-            setDeleteOpen(true);
-          }}
-        />
-      )}
+      <ResumeStatus
+        hasResume={!!resume}
+        aiReviewed={!!resume?.analysis}
+        reviewedAt={
+          resume?.analysis?.reviewedAt
+            ? new Date(
+                resume.analysis.reviewedAt
+              ).toLocaleDateString()
+            : undefined
+        }
+      />
 
-      {/* Create Resume Modal */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
+          
+      <CreateResumeCard
+      isEdit={!!resume}
+    onDelete={handleDelete}
+    />
+  {!resume && (
+    <UploadResumeCard />
+  )}
 
-      <CreateResumeModal
-  open={createOpen}
-  setOpen={setCreateOpen}
-  onCreate={handleCreateResume}
-/>
-
-      {/* Delete Resume Modal */}
-
-      <DeleteResumeModal
-      open={deleteOpen}
-      setOpen={setDeleteOpen}
-      onDelete={handleDeleteResume}
-/>
+</div>
 
     </main>
   );
