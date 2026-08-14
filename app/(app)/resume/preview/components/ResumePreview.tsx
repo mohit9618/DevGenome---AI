@@ -299,11 +299,11 @@ const ResumePreview = forwardRef<HTMLDivElement, ResumePreviewProps>(
 
               </div>
 
-              {project.techStack && (
+              {/* {project.techStack && (
                 <p className="text-[9.5px] italic text-slate-600">
                   {project.techStack}
                 </p>
-              )}
+              )} */}
 
               <ul className="mt-0.5 list-disc pl-4 text-[10.5px] leading-[1.35] text-slate-700">
 
