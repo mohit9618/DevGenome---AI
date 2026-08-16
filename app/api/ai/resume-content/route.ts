@@ -34,7 +34,7 @@ const ResumeAIRequestSchema = z.union([
 ]);
 
 const ResumeAIResponseSchema = z.object({
-    bullets: z.array(z.string()).min(1).max(4),
+    bullets: z.array(z.string()).min(1).max(5),
 });
 
 
@@ -102,7 +102,7 @@ ${location}
 Current Description:
 ${description}
 
-Generate 4 concise and impactful resume bullet points.
+Generate 5 concise and impactful resume bullet points.
 
 Rules:
 - Use strong action verbs.
