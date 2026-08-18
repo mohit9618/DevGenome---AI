@@ -11,6 +11,10 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+enum UsageFeature {
+  JOB_FIT
+  RESUME_ENHANCEMENT
+}
 
 model User {
   id        String   @id @default(cuid())
@@ -21,6 +25,8 @@ model User {
   imageUrl  String?
 
   resumes   Resume[]
+  credits   Credit?
+  usageLogs UsageLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -72,4 +78,31 @@ model ResumeAnalysis {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Credit {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  balance       Int      @default(0)
+  monthlyLimit  Int      @default(0)
+  usedThisMonth Int      @default(0)
+  resetAt       DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UsageLog {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  feature     UsageFeature
+  creditsUsed Int
+
+  createdAt DateTime @default(now())
 }
