@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { UsageFeature } from "@/app/generated/prisma/enums";
 
 const FREE_MONTHLY_CREDITS = 6;
 
@@ -62,15 +63,14 @@ export async function hasCredits(userId: string) {
 }
 
 export async function deductCredit(userId: string) {
-  const credits = await resetCreditsIfNeeded(userId);
+  await resetCreditsIfNeeded(userId);
 
-  if (credits.balance <= 0) {
-    throw new Error("No credits remaining");
-  }
-
-  return prisma.credit.update({
+  const result = await prisma.credit.updateMany({
     where: {
       userId,
+      balance: {
+        gt: 0,
+      },
     },
     data: {
       balance: {
@@ -79,6 +79,16 @@ export async function deductCredit(userId: string) {
       usedThisMonth: {
         increment: 1,
       },
+    },
+  });
+
+  if (result.count === 0) {
+    throw new Error("No credits remaining");
+  }
+
+  return prisma.credit.findUnique({
+    where: {
+      userId,
     },
   });
 }
@@ -101,6 +111,20 @@ export async function refundCredit(userId: string) {
       usedThisMonth: {
         decrement: 1,
       },
+    },
+  });
+}
+
+export async function createUsageLog(
+  userId: string,
+  feature: UsageFeature,
+  creditsUsed: number = 1
+) {
+  return prisma.usageLog.create({
+    data: {
+      userId,
+      feature,
+      creditsUsed,
     },
   });
 }

@@ -1,10 +1,18 @@
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/app/lib/prisma";
+
+import { deductCredit ,refundCredit , createUsageLog } from "@/app/lib/credits/credit.service";
+import { UsageFeature } from "@/app/generated/prisma/enums";
+
 import { extractText } from "unpdf";
 import { cleanResumeText } from "@/app/lib/cleanResumeText";
 import { anonymizeResumeText } from "@/app/lib/resume/anonymizeResumeText";
 
 import { GoogleGenAI } from "@google/genai";
-import { unknown, z } from "zod";
-import { error } from "console";
+import { z } from "zod";
+import ResponseCache from "next/dist/server/response-cache";
+
+
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -28,8 +36,25 @@ const JobFitAnalysisSchema = z.object({
 });
 
 export async function POST(request:Request){
+
+    let creditDeducted = false;
+    let databaseUserId: string | null = null;
+
     try {
-        
+        // authenticate
+        const {userId} = await auth();
+            if(!userId){
+                 return Response.json({success:false , error:"Unauthorized"},{status:401});
+         }
+
+        const user = await prisma.user.findUnique({where:{clerkId:userId,},});
+            if(!user){
+                return Response.json({success:false , error:"User Not found."},{status:404});
+            }
+            databaseUserId = user.id;
+
+
+
         const formData = await request.formData();
         const file = formData.get("file");
         const company = formData.get("company");
@@ -55,6 +80,10 @@ export async function POST(request:Request){
         if(typeof jobDescription != "string" || !jobDescription.trim()){
             return Response.json({success:false , error:"Job description is required."},{status:400});
         }
+
+
+        await deductCredit(user.id);
+        creditDeducted = true;
 
 
         const arrayBuffer = await file.arrayBuffer();
@@ -181,7 +210,7 @@ Base every score on evidence from the resume and job description.
         console.log("====Gemini Output====");
         console.log(rawOutput);
 
-        let parsedOutput = unknown;
+        let parsedOutput: unknown;
 
         try {
             parsedOutput = JSON.parse(rawOutput);
@@ -201,6 +230,14 @@ Base every score on evidence from the resume and job description.
             throw new Error("Invalid AI job fit analysis format.");
         }
 
+
+        try {
+            await createUsageLog(user.id , UsageFeature.JOB_FIT , 1);
+        }catch(usageError){
+            console.error("Failed to create usage log:",usageError);
+        }
+
+
         return Response.json({
             success:true,
             company: company.trim(),
@@ -210,6 +247,27 @@ Base every score on evidence from the resume and job description.
 
     } catch (error:any) {
         console.error("Job Fir Analyzer Error:",error);
-        return Response.json({success:false , error:"Failed to process job-fit request.",},{status:500});
+
+        if(error?.message === "No credits remaining"){
+            return Response.json({success:false, error:"No AI credits remaining"},{status:403});
+        }
+
+        if(creditDeducted && databaseUserId){
+            try {
+
+                await refundCredit(databaseUserId);
+                console.log("Credit refunded successfully.")
+
+            } catch (refundError) {
+                console.log("Failed to refund credit.", refundError);
+            }
+        }
+
+
+        return Response.json({
+            success:false , 
+            error:
+                process.env.NODE_ENV === "development"? error?.message || "Unkonwn server error." : "Failed to process job-fit request."
+            },{status:500});
     }
 }

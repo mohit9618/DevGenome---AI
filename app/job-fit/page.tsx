@@ -123,9 +123,8 @@ export default function JobFitPage() {
     const result = await response.json();
 
     if(!response.ok || !result.success){
-        throw new Error(
-            result.error || "Failed to analyze job fit."
-        );
+        setError(result.error || "Failed to analyze job fit.");
+        return;
         }
 
     setAnalysis(result.analysis);

@@ -62,10 +62,11 @@ async function handleAnalyze() {
     const result = await response.json();
 
     if (!response.ok || !result.success) {
-      throw new Error(
+    setError(
         result.error || "Failed to analyze resume."
-      );
-    }
+    );
+    return;
+}
 
     setAnalysis(result.analysis);
 

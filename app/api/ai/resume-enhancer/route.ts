@@ -1,11 +1,16 @@
-// pipeline: PDF ->Extract -> clean -> anonymize -> gemini -> structured analysis -> return alalysis to frontend
+// pipeline: user auth -> crdits check -> PDF ->Extract -> clean -> anonymize -> gemini -> structured analysis -> return alalysis to frontend
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/app/lib/prisma";
+
+import { deductCredit,refundCredit,createUsageLog } from "@/app/lib/credits/credit.service";
+import { UsageFeature } from "@/app/generated/prisma/client";
 
 import { extractText } from "unpdf";
 import { cleanResumeText } from "@/app/lib/cleanResumeText";
 import { anonymizeResumeText } from "@/app/lib/resume/anonymizeResumeText";
 
 import { GoogleGenAI } from "@google/genai";
-import { z } from "zod";
+import { success, z } from "zod";
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -75,7 +80,28 @@ const ResumeAnalysisSchema = z.object({
 
 
 export async function POST(request:Request){
+
+    let creditDeducted = false;
+    let databaseUserId: string | null = null;
+
     try {
+
+      const {userId} = await auth();
+      if(!userId){
+        return Response.json({success:false , error: "Unauthorized"},{status:401});
+      }
+
+      const user = await prisma.user.findUnique({
+        where: {
+          clerkId: userId,
+        }
+      });
+      if(!user){
+        return Response.json({success:false , error: "User not found."},{status:404});
+      }
+      databaseUserId = user.id;
+
+
         const formData = await request.formData();
         const file = formData.get("file");
 
@@ -86,6 +112,17 @@ export async function POST(request:Request){
         if(file.type !== "application/pdf"){
             return Response.json({success:false , error:"Only PDF files are allowed."},{status:400});
         }
+
+       console.log("Before enhancer credit deduction");
+
+const credit = await deductCredit(user.id);
+
+console.log(
+    "After enhancer credit deduction:",
+    credit
+);
+
+creditDeducted = true;
 
         const arrayBuffer = await file.arrayBuffer();
         
@@ -368,8 +405,8 @@ Important rules:
 
     const parsed = JSON.parse(rawOutput);
 
-    console.log("========== GEMINI OUTPUT ==========");
-console.log(JSON.stringify(parsed, null, 2));
+//     console.log("========== GEMINI OUTPUT ==========");
+// console.log(JSON.stringify(parsed, null, 2));
 
     const result = ResumeAnalysisSchema.safeParse(parsed);
 
@@ -380,14 +417,37 @@ console.log(JSON.stringify(parsed, null, 2));
     }
 
 
+    try{
+      await createUsageLog(user.id , UsageFeature.RESUME_ENHANCEMENT , 1);
+    }catch(usageError){
+      console.error("Failed to create usage log:", usageError);
+    }
+
+
         return Response.json({
             success:true,
             analysis: result.data,
         });
 
     } catch (error:any) {
-        console.error("PDF Extraction Error:",error);
+        console.error("Resume Enhancer Error:",error);
 
-        return Response.json({success:false, error: error?.message || "Failed to extract the PDF text."},{status:500});
+        if(error?.message === "No credits remaining"){
+          return Response.json({success:false , error:"No AI credits remaining."},{status:403});
+        }
+
+        if(creditDeducted && databaseUserId){
+          try{
+            await refundCredit(databaseUserId);
+            console.log("Credit refunded successfully.");
+          }catch(refundError){
+            console.error("Failed to refund credit.",refundError);
+          }
+        }
+
+        return Response.json({success:false, 
+            error: 
+            process.env.NODE_ENV === "development" ? error?.message || "Failed to process resume." : "Failde to process resume."},
+            {status:500});
     }
 }
