@@ -15,6 +15,8 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { validateJobFitBudget } from "@/app/lib/budgeting/input-budgeting";
 
+import { captureError } from "@/app/lib/monitoring/error-monitor";
+
 
 
 
@@ -50,7 +52,6 @@ export async function POST(request:Request){
             if(!userId){
                  return Response.json({success:false , error:"Unauthorized"},{status:401});
          }
-
 
         // Rate limiting
         const rateLimit = await checkRateLimit(userId, "ai");
@@ -269,6 +270,12 @@ Base every score on evidence from the resume and job description.
         if(error?.message === "No credits remaining"){
             return Response.json({success:false, error:"No AI credits remaining"},{status:403});
         }
+
+        captureError(error, {
+        feature: "job-fit",
+        userId: databaseUserId ?? undefined,
+        route: "/api/ai/job-fit",
+    });
 
         if(creditDeducted && databaseUserId){
             try {

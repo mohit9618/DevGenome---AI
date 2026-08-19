@@ -14,6 +14,8 @@ import { success, z } from "zod";
 import { checkRateLimit } from "@/app/lib/rate-limit";
 import { validateEnhancerBudget } from "@/app/lib/budgeting/input-budgeting";
 
+import { captureError } from "@/app/lib/monitoring/error-monitor";
+
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
 });
@@ -446,6 +448,8 @@ Important rules:
           return Response.json({success:false , error:"No AI credits remaining."},{status:403});
         }
 
+
+
         if(creditDeducted && databaseUserId){
           try{
             await refundCredit(databaseUserId);
@@ -454,6 +458,11 @@ Important rules:
             console.error("Failed to refund credit.",refundError);
           }
         }
+
+         captureError(error, {
+        feature: "resume-enhancer",
+        route: "/api/ai/enhancer",
+    });
 
         return Response.json({success:false, 
             error: 

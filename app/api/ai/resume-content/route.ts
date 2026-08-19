@@ -3,6 +3,7 @@ import { checkRateLimit } from "@/app/lib/rate-limit";
 import { auth } from "@clerk/nextjs/server";
 import {GoogleGenAI} from "@google/genai";
 import {success, z} from "zod";
+import { captureError } from "@/app/lib/monitoring/error-monitor";
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -213,6 +214,11 @@ Rules:
 
     } catch (error:any) {
         console.error("AI Error:",error);
+
+        captureError(error, {
+        feature: "resume-content",
+        route: "/api/resume/content",
+    });
 
         return Response.json(
             {
