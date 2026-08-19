@@ -13,6 +13,8 @@ import { anonymizeResumeText } from "@/app/lib/resume/anonymizeResumeText";
 
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
+import { validateJobFitBudget } from "@/app/lib/budgeting/input-budgeting";
+
 
 
 
@@ -91,9 +93,6 @@ export async function POST(request:Request){
             return Response.json({success:false , error:"Job description is required."},{status:400});
         }
 
-
-        await deductCredit(user.id);
-        creditDeducted = true;
 
 
         const arrayBuffer = await file.arrayBuffer();
@@ -202,6 +201,15 @@ Base every score on evidence from the resume and job description.
 `;
 
 
+        const budget = await validateJobFitBudget(prompt);
+        if(!budget.success){
+            return Response.json({success:false , error: budget.error},{status:400});
+        }
+
+        await deductCredit(user.id);
+        creditDeducted = true;
+
+
         const response = await ai.models.generateContent({
             model: "gemini-3.6-flash",
 
@@ -214,7 +222,7 @@ Base every score on evidence from the resume and job description.
 
         const rawOutput = response.text;
         if(!rawOutput){
-            throw new Error('Geminin returned an empty response.')
+            throw new Error('Gemini returned an empty response.')
         }
 
         console.log("====Gemini Output====");

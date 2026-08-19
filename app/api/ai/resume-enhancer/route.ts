@@ -12,6 +12,7 @@ import { anonymizeResumeText } from "@/app/lib/resume/anonymizeResumeText";
 import { GoogleGenAI } from "@google/genai";
 import { success, z } from "zod";
 import { checkRateLimit } from "@/app/lib/rate-limit";
+import { validateEnhancerBudget } from "@/app/lib/budgeting/input-budgeting";
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -122,16 +123,6 @@ export async function POST(request:Request){
             return Response.json({success:false , error:"Only PDF files are allowed."},{status:400});
         }
 
-       console.log("Before enhancer credit deduction");
-
-const credit = await deductCredit(user.id);
-
-console.log(
-    "After enhancer credit deduction:",
-    credit
-);
-
-creditDeducted = true;
 
         const arrayBuffer = await file.arrayBuffer();
         
@@ -182,6 +173,16 @@ Important rules:
 - Suggestions should improve the existing resume, not create fictional content.
 - Keep feedback concise.
 `;
+
+
+    const budget = await validateEnhancerBudget(prompt);
+    if(!budget.success){
+      return Response.json({success:false , error:budget.error},{status:400});
+    }
+
+    await deductCredit(user.id);
+    creditDeducted = true;
+
 
     const response = await ai.models.generateContent({
   model: "gemini-3.6-flash",

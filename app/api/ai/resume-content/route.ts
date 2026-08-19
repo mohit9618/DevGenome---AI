@@ -1,3 +1,4 @@
+import { validateBuilderBudget } from "@/app/lib/budgeting/input-budgeting";
 import { checkRateLimit } from "@/app/lib/rate-limit";
 import { auth } from "@clerk/nextjs/server";
 import {GoogleGenAI} from "@google/genai";
@@ -161,6 +162,12 @@ Rules:
 - Keep each suggestion suitable for a professional software engineering resume.
 - Return only the requested JSON structure.
         `
+    }
+
+
+    const budget = await validateBuilderBudget(prompt);
+    if(!budget.success){
+        return Response.json({success:false , error:budget.error},{status:400});
     }
 
         const response = await ai.models.generateContent({
