@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { v2 as cloudinary } from "cloudinary";
+import { checkRateLimit } from "@/app/lib/rate-limit";
+import { success } from "zod";
 
 // Configuration
 cloudinary.config({
@@ -15,13 +17,17 @@ interface CloudinaryUploadResult {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
 
+  // authenticate
+  const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+    return NextResponse.json({success:false, error: "Unauthorized" },{ status: 401 });
+  }
+
+  // rate limiting
+  const rateLimit = await checkRateLimit(userId , "heavy");
+  if(!rateLimit.success){
+    return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
   }
 
   try {

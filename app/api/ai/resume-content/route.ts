@@ -1,5 +1,7 @@
+import { checkRateLimit } from "@/app/lib/rate-limit";
+import { auth } from "@clerk/nextjs/server";
 import {GoogleGenAI} from "@google/genai";
-import {z} from "zod";
+import {success, z} from "zod";
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -40,6 +42,19 @@ const ResumeAIResponseSchema = z.object({
 
 export async function POST(request: Request){
     try {
+
+        // authenticate
+        const { userId } = await auth();
+        if(!userId){
+            return Response.json({success:false , error:"Unauthorized",},{status:401});
+        }
+
+        // rate limiting
+        const rateLimit = await checkRateLimit(userId,"ai");
+        if(!rateLimit.success){
+            return Response.json({success:false , error:'Too many requests. Please try again later.'},{status:429}); 
+        }
+
 
         const body = await request.json();
 

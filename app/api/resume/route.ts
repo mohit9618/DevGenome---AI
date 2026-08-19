@@ -1,18 +1,25 @@
 import { NextResponse , NextRequest} from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
+import { checkRateLimit } from "@/app/lib/rate-limit";
 
 // POST Resume
 export async function POST(request: NextRequest) {
   try {
+
+    // authenticate
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({success:false , error: "Unauthorized" },{ status: 401 });
     }
+
+    // rate limiting
+    const rateLimit = await checkRateLimit(userId , "builder");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
+    }
+
 
     const body = await request.json();
 
@@ -61,13 +68,18 @@ export async function POST(request: NextRequest) {
 // Get resume
 export async function GET() {
   try {
+
+    // authenticate
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+        return NextResponse.json({ success:false ,error: "Unauthorized" },{ status: 401 });
+    }
+
+    // rate limiting
+    const rateLimit = await checkRateLimit(userId , "normal");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
     }
     
     console.log("1. Clerk user:", userId);
@@ -111,14 +123,20 @@ export async function GET() {
 // Update resume
 export async function PATCH(request: NextRequest) {
   try {
+    // authenticate
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+        return NextResponse.json({ success:false ,error: "Unauthorized" },{ status: 401 });
     }
+
+    // rate limiting
+    const rateLimit = await checkRateLimit(userId , "builder");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
+    }
+
+
 
     const existingUser = await prisma.user.findUnique({
       where: {
@@ -197,14 +215,20 @@ export async function PATCH(request: NextRequest) {
 // Delete resume
 export async function DELETE(request:NextRequest) {
   try {
+    // authenticate
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+        return NextResponse.json({ success:false ,error: "Unauthorized" },{ status: 401 });
     }
+
+    // rate limiting
+    const rateLimit = await checkRateLimit(userId , "builder");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
+    }
+
+
 
     const existingUser = await prisma.user.findUnique({
         where:{

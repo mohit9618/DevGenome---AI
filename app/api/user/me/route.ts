@@ -1,18 +1,23 @@
 import { NextResponse , NextRequest} from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
+import { checkRateLimit } from "@/app/lib/rate-limit";
 
 
 // Get user
 export async function GET() {
   try {
-    const { userId } = await auth();
 
+    // authenticate
+    const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" },{ status: 401 });
+    }
+
+    // rate Limiting
+    const rateLimit = await checkRateLimit(userId,"normal");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
     }
 
     const user = await prisma.user.findUnique({
@@ -35,13 +40,16 @@ export async function GET() {
 // Update User
 export async function PATCH(request: NextRequest) {
   try {
+    // authenticate
     const { userId } = await auth();
-
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" },{ status: 401 });
+    }
+
+    // rate Limiting
+    const rateLimit = await checkRateLimit(userId,"normal");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
     }
 
     const body = await request.json();
@@ -69,13 +77,16 @@ export async function PATCH(request: NextRequest) {
 // Delete User
 export async function DELETE() {
   try {
+    // authenticate
     const { userId } = await auth();
-
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" },{ status: 401 });
+    }
+
+    // rate Limiting
+    const rateLimit = await checkRateLimit(userId,"normal");
+    if(!rateLimit.success){
+      return Response.json({success:false , error:"Too many requests. Please try again later."},{status:429});
     }
 
     await prisma.user.delete({

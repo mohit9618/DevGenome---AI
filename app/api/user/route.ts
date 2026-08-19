@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
+import { checkRateLimit } from "@/app/lib/rate-limit";
+import { success } from "zod";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
 
+    // authenticate
+    const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" },{ status: 401 });
     }
+
+    // rate limiting
+    const rateLimit = await checkRateLimit(userId, "normal");
+    if(!rateLimit.success){
+      return Response.json({success:false , error: "Too many requests. Please try again later."},{status:429});
+    }
+
+
 
     const body = await request.json();
 

@@ -1,4 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
+
+import { checkRateLimit } from "@/app/lib/rate-limit";
+
 import { prisma } from "@/app/lib/prisma";
 
 import { deductCredit ,refundCredit , createUsageLog } from "@/app/lib/credits/credit.service";
@@ -10,7 +13,6 @@ import { anonymizeResumeText } from "@/app/lib/resume/anonymizeResumeText";
 
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import ResponseCache from "next/dist/server/response-cache";
 
 
 
@@ -46,6 +48,14 @@ export async function POST(request:Request){
             if(!userId){
                  return Response.json({success:false , error:"Unauthorized"},{status:401});
          }
+
+
+        // Rate limiting
+        const rateLimit = await checkRateLimit(userId, "ai");
+        if(!rateLimit.success){
+            return Response.json({success:false , error: "Too many requests. Please try again later."},{status:429});
+        }
+
 
         const user = await prisma.user.findUnique({where:{clerkId:userId,},});
             if(!user){
